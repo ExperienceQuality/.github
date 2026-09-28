@@ -1,0 +1,7 @@
+{
+  "name": "Node.js library test",
+  "description": "Test a Node.js library through the ExperienceQuality reusable workflow.",
+  "iconName": "octicon beaker",
+  "categories": ["JavaScript", "TypeScript", "npm"]
+}
+

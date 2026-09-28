@@ -1,0 +1,79 @@
+name: Reusable Node.js library publish
+
+# hub-stage: publish
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node.js version
+        required: false
+        type: string
+        default: "24"
+      package-manager:
+        description: Package manager (npm or pnpm)
+        required: true
+        type: string
+      package-name:
+        description: Exact npm package name allowed to publish
+        required: true
+        type: string
+      package-directory:
+        description: Package directory relative to repository root
+        required: true
+        type: string
+      tag-prefix:
+        description: Git tag prefix, without @version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out caller
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          path: source
+      - name: Check out workflow implementation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: workflow-source
+      - name: Set up Node.js for GitHub Packages
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          registry-url: https://npm.pkg.github.com
+          scope: "@experiencequality"
+      - name: Verify, pack, and publish exact package
+        env:
+          ARTIFACT_DIRECTORY: ${{ runner.temp }}/node-library-publish
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_PACKAGE_MANAGER: ${{ inputs.package-manager }}
+          INPUT_PACKAGE_NAME: ${{ inputs.package-name }}
+          INPUT_PACKAGE_DIRECTORY: ${{ inputs.package-directory }}
+          INPUT_TAG_PREFIX: ${{ inputs.tag-prefix }}
+        run: |
+          mkdir -p "$ARTIFACT_DIRECTORY"
+          node workflow-source/scripts/node-library-runner.mjs publish \
+            --workspace "$GITHUB_WORKSPACE/source" \
+            --package-manager "$INPUT_PACKAGE_MANAGER" \
+            --package-name "$INPUT_PACKAGE_NAME" \
+            --package-directory "$INPUT_PACKAGE_DIRECTORY" \
+            --tag-prefix "$INPUT_TAG_PREFIX" \
+            --git-ref "$GITHUB_REF" \
+            --github-repository "$GITHUB_REPOSITORY" \
+            --artifact-directory "$ARTIFACT_DIRECTORY"
+      - name: Upload published package artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: published-node-library-package
+          path: ${{ runner.temp }}/node-library-publish/*.tgz
+          if-no-files-found: ignore

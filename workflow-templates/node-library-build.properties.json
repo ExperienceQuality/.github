@@ -1,0 +1,7 @@
+{
+  "name": "Node.js library build",
+  "description": "Build and pack a Node.js library through the ExperienceQuality reusable workflow.",
+  "iconName": "octicon package",
+  "categories": ["JavaScript", "TypeScript", "npm"]
+}
+
