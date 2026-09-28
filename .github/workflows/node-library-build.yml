@@ -1,0 +1,60 @@
+name: Reusable Node.js library build
+
+# hub-stage: build
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node.js version
+        required: false
+        type: string
+        default: "24"
+      package-manager:
+        description: Package manager (npm or pnpm)
+        required: true
+        type: string
+      working-directory:
+        description: Package directory relative to repository root
+        required: false
+        type: string
+        default: "."
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out caller
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: source
+      - name: Check out workflow implementation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: workflow-source
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ inputs.node-version }}
+      - name: Build and collect packages
+        env:
+          ARTIFACT_DIRECTORY: ${{ runner.temp }}/node-library-build
+          INPUT_PACKAGE_MANAGER: ${{ inputs.package-manager }}
+          INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        run: |
+          mkdir -p "$ARTIFACT_DIRECTORY"
+          node workflow-source/scripts/node-library-runner.mjs build \
+            --workspace "$GITHUB_WORKSPACE/source" \
+            --package-manager "$INPUT_PACKAGE_MANAGER" \
+            --working-directory "$INPUT_WORKING_DIRECTORY" \
+            --artifact-directory "$ARTIFACT_DIRECTORY"
+      - name: Upload packed artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: node-library-package
+          path: ${{ runner.temp }}/node-library-build/*.tgz
+          if-no-files-found: error

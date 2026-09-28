@@ -1,0 +1,6 @@
+{
+  "name": "Node.js library GitHub Packages publish",
+  "description": "Verify and publish one scoped package to GitHub Packages with the caller GITHUB_TOKEN.",
+  "iconName": "octicon package-dependencies",
+  "categories": ["JavaScript", "TypeScript", "npm"]
+}

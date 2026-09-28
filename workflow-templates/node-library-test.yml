@@ -1,0 +1,19 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [$default-branch]
+
+permissions:
+  contents: read
+
+jobs:
+  # hub-stage: test
+  test:
+    uses: ExperienceQuality/.github/.github/workflows/node-library-test.yml@v1
+    with:
+      node-version: "24"
+      package-manager: npm
+      working-directory: .
+

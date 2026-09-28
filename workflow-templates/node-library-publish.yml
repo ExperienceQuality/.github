@@ -1,0 +1,21 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "package@*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # hub-stage: publish
+  publish:
+    uses: ExperienceQuality/.github/.github/workflows/node-library-publish.yml@v1
+    with:
+      node-version: "24"
+      package-manager: npm
+      package-name: "@experiencequality/package"
+      package-directory: .
+      tag-prefix: package

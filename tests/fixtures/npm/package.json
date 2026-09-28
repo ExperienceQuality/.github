@@ -1,0 +1,9 @@
+{
+  "name": "fixture-npm",
+  "version": "1.2.3",
+  "scripts": {
+    "ci:build": "node -e \"require('fs').mkdirSync('artifacts',{recursive:true});require('fs').writeFileSync('artifacts/fixture-npm-1.2.3.tgz','fixture')\"",
+    "ci:test": "node -e \"process.exit(0)\"",
+    "ci:release": "node -e \"process.exit(0)\""
+  }
+}

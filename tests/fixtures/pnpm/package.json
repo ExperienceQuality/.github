@@ -1,0 +1,10 @@
+{
+  "name": "fixture-pnpm",
+  "version": "2.3.4",
+  "packageManager": "pnpm@10.17.1",
+  "scripts": {
+    "ci:build": "node -e \"require('fs').mkdirSync('artifacts',{recursive:true});require('fs').writeFileSync('artifacts/fixture-pnpm-2.3.4.tgz','fixture')\"",
+    "ci:test": "node -e \"process.exit(0)\"",
+    "ci:release": "node -e \"process.exit(0)\""
+  }
+}
