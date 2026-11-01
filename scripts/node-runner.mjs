@@ -2,7 +2,7 @@
 
 import { copyFileSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -124,6 +124,24 @@ function run(command, args, options = {}) {
   if (result.status !== 0) throw new Error(`${command} exited with status ${result.status}`);
 }
 
+function pnpmProcessEnv(workspace) {
+  run("corepack", ["enable"], { cwd: workspace });
+  const spec = readManifest(workspace).packageManager;
+  if (typeof spec !== "string" || !spec.startsWith("pnpm@")) {
+    throw new Error("pnpm requires a packageManager field in root package.json (for example pnpm@12.10.0)");
+  }
+  run("corepack", ["prepare", spec, "--activate"], { cwd: workspace });
+  const pnpmPath = capture("corepack", ["pnpm", "exec", "which", "pnpm"], { cwd: workspace });
+  const binDir = dirname(pnpmPath);
+  const pathKey = process.platform === "win32" ? "Path" : "PATH";
+  const currentPath = process.env[pathKey] ?? "";
+  return { ...process.env, [pathKey]: currentPath ? `${binDir}${sep}${currentPath}` : binDir };
+}
+
+function commandEnv(workspace, packageManager) {
+  return packageManager === "pnpm" ? pnpmProcessEnv(workspace) : process.env;
+}
+
 function capture(command, args, options = {}) {
   const result = spawnSync(command, args, { encoding: "utf8", ...options });
   if (result.error) throw result.error;
@@ -136,16 +154,18 @@ function capture(command, args, options = {}) {
 
 function installDependencies(workspace, packageManager) {
   validateLockfile(workspace, packageManager);
+  const env = commandEnv(workspace, packageManager);
   const [command, args] = packageManagerCommand(packageManager, "install");
-  run(command, args, { cwd: workspace });
+  run(command, args, { cwd: workspace, env });
 }
 
 function runContract(workspace, packageManager, scriptName) {
   const manifest = readManifest(workspace);
   validateScript(manifest, scriptName);
   const operation = scriptName.slice(3);
+  const env = commandEnv(workspace, packageManager);
   const [command, args] = packageManagerCommand(packageManager, operation);
-  run(command, args, { cwd: workspace });
+  run(command, args, { cwd: workspace, env });
 }
 
 function pack(directory, destination) {
