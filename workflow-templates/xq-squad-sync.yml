@@ -1,0 +1,26 @@
+name: XQ Squad sync
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      squad-version:
+        description: "XQ Squad release tag"
+        required: false
+        default: v1.4.0
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    uses: ExperienceQuality/.github/.github/workflows/xq-squad-sync.yml@v1
+    with:
+      target-repository: ${{ github.repository }}
+      squad-version: ${{ inputs.squad-version || 'v1.4.0' }}
+      open-pull-request: true
+      branch-name: xq/squad-sync
+    secrets:
+      sync-token: ${{ secrets.XQ_SQUAD_SYNC_TOKEN }}

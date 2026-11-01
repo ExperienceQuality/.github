@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "XQ Squad Delivery Session Claim",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "deliveryId",
+    "ownerToken",
+    "generation",
+    "state",
+    "repositoryRoot",
+    "branch",
+    "worktreePath",
+    "baseRef",
+    "baseCommit",
+    "scope",
+    "createdAt",
+    "heartbeatAt",
+    "approval"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Registry record schema version; unknown versions fail closed."
+    },
+    "deliveryId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "maxLength": 80,
+      "description": "Restrictive lowercase kebab delivery identifier; released IDs are never reused."
+    },
+    "ownerToken": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque local fencing token (not a credential); redacted from sanitized output."
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991,
+      "description": "Positive safe integer incremented under the registry mutex."
+    },
+    "state": {
+      "type": "string",
+      "enum": ["PREPARING", "ACTIVE", "RECOVERY_REQUIRED", "RELEASED"]
+    },
+    "repositoryRoot": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "description": "Absolute path of the recorded main checkout."
+    },
+    "branch": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "worktreePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "description": "Absolute path of the delivery worktree."
+    },
+    "baseRef": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "baseCommit": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
+      "description": "SHA-1 or SHA-256 hex commit the delivery is based on."
+    },
+    "scope": {
+      "type": "array",
+      "maxItems": 256,
+      "items": { "type": "string", "minLength": 1, "maxLength": 4096 },
+      "description": "Literal repo-relative POSIX file/subtree scope entries."
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "heartbeatAt": { "type": "string", "format": "date-time" },
+    "approval": { "$ref": "#/definitions/evidence" },
+    "stoppedConfirmation": { "$ref": "#/definitions/evidence" },
+    "stoppedConfirmedAt": { "type": "string", "format": "date-time" },
+    "releasedAt": { "type": "string", "format": "date-time" },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1, "maxLength": 1024 }
+      },
+      "description": "Optional metadata for partial provisioning failures."
+    }
+  },
+  "definitions": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirmed", "reference"],
+      "properties": {
+        "confirmed": { "const": true },
+        "reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "description": "User-message reference recorded by the Lead; not proof of consent alone."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "state": { "const": "RELEASED" } } },
+      "then": { "required": ["stoppedConfirmation", "stoppedConfirmedAt", "releasedAt"] }
+    }
+  ],
+  "additionalProperties": false
+}

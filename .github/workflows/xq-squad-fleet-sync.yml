@@ -1,0 +1,47 @@
+name: XQ Squad fleet sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      squad-version:
+        description: "XQ Squad release tag (e.g. v1.4.0)"
+        required: false
+        type: string
+        default: v1.4.0
+      open-pull-request:
+        description: "Open pull requests instead of pushing to default branches"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    strategy:
+      fail-fast: false
+      matrix:
+        repository:
+          - ExperienceQuality/xq-fitness-app
+          - ExperienceQuality/xq-financial-app
+          - ExperienceQuality/jvm-test-kit
+          - ExperienceQuality/xq-xcuitest-support
+          - ExperienceQuality/xq-svc-exercice
+          - ExperienceQuality/xq-platform
+          - ExperienceQuality/xq-svc-routine
+          - ExperienceQuality/xq-exercices-miniapp
+          - ExperienceQuality/xq-hub
+          - ExperienceQuality/xq-aegis
+          - ExperienceQuality/xq-luthor
+          - ExperienceQuality/xq-jewy
+          - ExperienceQuality/xq-fitness-bff
+          - ExperienceQuality/.github
+    uses: ./.github/workflows/xq-squad-sync.yml
+    with:
+      target-repository: ${{ matrix.repository }}
+      squad-version: ${{ inputs.squad-version }}
+      open-pull-request: ${{ inputs.open-pull-request }}
+      branch-name: xq/squad-${{ inputs.squad-version }}-sync
+    secrets:
+      sync-token: ${{ secrets.XQ_SQUAD_SYNC_TOKEN }}

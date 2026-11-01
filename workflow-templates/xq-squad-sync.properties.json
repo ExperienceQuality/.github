@@ -1,0 +1,8 @@
+{
+  "name": "XQ Squad sync",
+  "description": "Install or upgrade XQ Squad on the default branch (requires XQ_SQUAD_SYNC_TOKEN).",
+  "iconName": "sync",
+  "categories": ["Automation", "Continuous integration"],
+  "filePatterns": [".squad/squad.json", "AGENTS.md"],
+  "labels": ["github-actions", "xq-squad"]
+}

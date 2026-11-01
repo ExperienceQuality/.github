@@ -1,0 +1,102 @@
+name: Reusable XQ Squad sync
+
+on:
+  workflow_call:
+    inputs:
+      target-repository:
+        description: "Repository to sync (OWNER/NAME, e.g. ExperienceQuality/xq-platform)"
+        required: true
+        type: string
+      squad-version:
+        description: "XQ Squad release tag (e.g. v1.4.0)"
+        required: false
+        type: string
+        default: v1.4.0
+      open-pull-request:
+        description: "Open a pull request instead of pushing directly to the default branch"
+        required: false
+        type: boolean
+        default: true
+      branch-name:
+        description: "Branch name for squad sync commits"
+        required: false
+        type: string
+        default: xq/squad-sync
+    secrets:
+      sync-token:
+        description: "GitHub token with contents write access to target-repository"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out workflow implementation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: workflow-source
+
+      - name: Check out target repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ inputs.target-repository }}
+          token: ${{ secrets.sync-token }}
+          fetch-depth: 0
+          path: target
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+
+      - name: Install or upgrade XQ Squad
+        env:
+          XQ_SQUAD_ASSUME_YES: "true"
+        run: |
+          bash workflow-source/scripts/xq-squad-sync-runner.sh \
+            target \
+            "${{ inputs.squad-version }}"
+
+      - name: Commit squad sync
+        id: commit
+        working-directory: target
+        env:
+          GH_TOKEN: ${{ secrets.sync-token }}
+          VERSION: ${{ inputs.squad-version }}
+          BRANCH: ${{ inputs.branch-name }}
+          OPEN_PR: ${{ inputs.open-pull-request }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- AGENTS.md .devin .squad .cursor; then
+            echo "No squad file changes."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git add AGENTS.md .devin .squad .cursor
+          git commit -m "chore(squad): sync XQ Squad to ${VERSION}"
+
+          default_branch="$(gh repo view "${{ inputs.target-repository }}" --json defaultBranchRef -q .defaultBranchRef.name)"
+          if [[ "$OPEN_PR" == "true" ]]; then
+            git checkout -B "$BRANCH"
+            git push -u origin "$BRANCH" --force-with-lease
+            existing="$(gh pr list --repo "${{ inputs.target-repository }}" --head "$BRANCH" --json number -q '.[0].number' || true)"
+            if [[ -z "$existing" ]]; then
+              gh pr create \
+                --repo "${{ inputs.target-repository }}" \
+                --base "$default_branch" \
+                --head "$BRANCH" \
+                --title "chore(squad): sync XQ Squad to ${VERSION}" \
+                --body "Automated XQ Squad sync to ${VERSION} from ExperienceQuality/.github."
+            fi
+          else
+            git push origin "HEAD:${default_branch}"
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"

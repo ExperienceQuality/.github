@@ -1,0 +1,178 @@
+{
+  "$schema": "./schemas/squad-config.schema.json",
+  "name": "xq-squad",
+  "version": "1.4.0",
+  "release_tag": "v1.4.0",
+  "config_schema_version": "1.0.0",
+  "memory_schema_version": "1.0.0",
+  "repository": "https://github.com/ExperienceQuality/xq-squad",
+  "description": "Repository-native agent squad for software delivery (Devin and Cursor adapters).",
+  "runtimes": {
+    "devin": {
+      "adapter_root": "../.devin",
+      "description": "Devin profiles and skills."
+    },
+    "cursor": {
+      "adapter_root": "../.cursor",
+      "description": "Cursor rules, subagents, skills, and hooks."
+    }
+  },
+  "components": {
+    "agents": {
+      "lead": {
+        "path": "agents/lead.md",
+        "description": "Main orchestrator. Run in the parent agent session, not as subagent.",
+        "managed": true
+      },
+      "analyst": {
+        "path": "agents/analyst.md",
+        "devin_profile": "../.devin/agents/analyst.md",
+        "description": "Repository discovery and impact analysis.",
+        "managed": true,
+        "cursor_profile": "../.cursor/agents/analyst.md"
+      },
+      "implementer": {
+        "path": "agents/implementer.md",
+        "devin_profile": "../.devin/agents/implementer.md",
+        "description": "Assigned code changes following conventions.",
+        "managed": true,
+        "cursor_profile": "../.cursor/agents/implementer.md"
+      },
+      "tester": {
+        "path": "agents/tester.md",
+        "devin_profile": "../.devin/agents/tester.md",
+        "description": "Relevant checks and test execution.",
+        "managed": true,
+        "cursor_profile": "../.cursor/agents/tester.md"
+      },
+      "reviewer": {
+        "path": "agents/reviewer.md",
+        "devin_profile": "../.devin/agents/reviewer.md",
+        "description": "Change review and risk identification.",
+        "managed": true,
+        "cursor_profile": "../.cursor/agents/reviewer.md"
+      },
+      "memory-maintainer": {
+        "path": "agents/memory-maintainer.md",
+        "devin_profile": "../.devin/agents/memory-maintainer.md",
+        "description": "Durable memory reconciliation and update.",
+        "managed": true,
+        "cursor_profile": "../.cursor/agents/memory-maintainer.md"
+      }
+    },
+    "skills": {
+      "squad-delivery": {
+        "path": "../.devin/skills/squad-delivery/SKILL.md",
+        "description": "On-demand delivery workflow skill.",
+        "managed": true,
+        "cursor_path": "../.cursor/skills/squad-delivery/SKILL.md"
+      },
+      "train-me": {
+        "path": "../.devin/skills/train-me/SKILL.md",
+        "description": "Patient tutor that helps the user learn any technical topic.",
+        "managed": true,
+        "cursor_path": "../.cursor/skills/train-me/SKILL.md"
+      },
+      "fetch-openapi-spec": {
+        "path": "../.devin/skills/fetch-openapi-spec/SKILL.md",
+        "description": "Fetch the latest OpenAPI contract for a service from the centralized xq-luthor repository.",
+        "managed": true,
+        "cursor_path": "../.cursor/skills/fetch-openapi-spec/SKILL.md"
+      }
+    },
+    "workflows": {
+      "delivery": {
+        "path": "workflows/delivery.md",
+        "managed": true
+      },
+      "memory-maintenance": {
+        "path": "workflows/memory-maintenance.md",
+        "managed": true
+      },
+      "parallel-execution": {
+        "path": "workflows/parallel-execution.md",
+        "managed": true
+      },
+      "concurrent-delivery": {
+        "path": "workflows/concurrent-delivery.md",
+        "managed": true
+      }
+    },
+    "schemas": {
+      "squad-config": {
+        "path": "schemas/squad-config.schema.json",
+        "managed": true
+      },
+      "memory-record": {
+        "path": "schemas/memory-record.schema.json",
+        "managed": true
+      },
+      "delivery-session": {
+        "path": "schemas/delivery-session.schema.json",
+        "managed": true
+      }
+    },
+    "rules": {
+      "xq-squad": {
+        "path": "../.cursor/rules/xq-squad.mdc",
+        "description": "Always-on Cursor rule pointing to canonical .squad contracts.",
+        "managed": true
+      }
+    },
+    "hooks": {
+      "cursor-hooks": {
+        "path": "../.cursor/hooks.json",
+        "description": "Cursor hook config; squad entries merged, consumer entries preserved.",
+        "managed": true
+      },
+      "git-guard": {
+        "path": "../.cursor/hooks/xq-squad-git-guard.mjs",
+        "description": "Ask before git commit/push and PR/release creation.",
+        "managed": true
+      },
+      "scope-guard": {
+        "path": "../.cursor/hooks/xq-squad-scope-guard.mjs",
+        "description": "Deny writes outside the claimed scope in delivery worktrees.",
+        "managed": true
+      },
+      "verify-reminder": {
+        "path": "../.cursor/hooks/xq-squad-verify-reminder.mjs",
+        "description": "One follow-up asking for verification and memory status in delivery worktrees.",
+        "managed": true
+      }
+    }
+  },
+  "ownership": {
+    "upstream_managed": [
+      ".devin/agents/**",
+      ".devin/skills/**",
+      ".devin/rules/**",
+      ".squad/agents/**",
+      ".squad/workflows/**",
+      ".squad/schemas/**",
+      ".squad/scripts/**",
+      ".squad/README.md",
+      ".cursor/agents/**",
+      ".cursor/skills/**",
+      ".cursor/rules/xq-squad*.mdc",
+      ".cursor/hooks/xq-squad-*"
+    ],
+    "merge_managed": [
+      "AGENTS.md",
+      ".squad/squad.json",
+      ".squad/install-state.json",
+      ".cursor/hooks.json"
+    ],
+    "consumer_owned": [
+      ".squad/MEMORY.md",
+      ".squad/knowledge/**",
+      ".squad/memory/**",
+      ".devin/rules/local-*",
+      ".devin/agents/local-*",
+      ".cursor/agents/local-*",
+      ".cursor/rules/local-*",
+      ".cursor/skills/local-*",
+      ".cursor/hooks/local-*"
+    ]
+  }
+}

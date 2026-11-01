@@ -52,6 +52,22 @@ The first GitHub Packages publication creates the package with the registry's de
 
 Reusable workflows check out their helper implementation from `${{ job.workflow_repository }}` at `${{ job.workflow_sha }}`. This couples helper code to the exact called workflow revision and avoids caller-SHA confusion. These `job` context properties require GitHub.com; GitHub Enterprise Server compatibility is not claimed.
 
+## XQ Squad fleet sync
+
+Latest XQ Squad release: [v1.4.0](https://github.com/ExperienceQuality/xq-squad/releases/tag/v1.4.0).
+
+This repository ships reusable automation to install or upgrade [XQ Squad](https://github.com/ExperienceQuality/xq-squad) across ExperienceQuality repositories:
+
+- `scripts/xq-squad-sync-runner.sh` — runs the published `install.sh` or `update.sh` for a pinned tag.
+- `scripts/xq-squad-fleet-audit.mjs` — reports which org repositories match an expected semver (`node scripts/xq-squad-fleet-audit.mjs --expected 1.4.0`).
+- `.github/workflows/xq-squad-sync.yml` — reusable workflow that syncs one repository and opens a pull request (default) or pushes to the default branch.
+- `.github/workflows/xq-squad-fleet-sync.yml` — manual matrix over the standard ExperienceQuality repositories.
+- `workflow-templates/xq-squad-sync.yml` — optional weekly per-repository caller.
+
+Configure an organization or repository secret `XQ_SQUAD_SYNC_TOKEN` with `contents` and `pull_requests` write access to the repositories you want to update. Then run **XQ Squad fleet sync** from the Actions tab (default `v1.4.0`), review the opened pull requests, and merge them.
+
+This checkout includes XQ Squad **v1.4.0** under `.squad/`, `.cursor/`, `.devin/`, and the managed section of `AGENTS.md`.
+
 ## Templates and validation
 
 `workflow-templates/` contains thin build, test, and GitHub Packages publish callers. Replace publish template package policy before use. Validate changes with:

@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "XQ Squad Memory Record",
+  "type": "object",
+  "required": ["id", "type", "topic", "summary", "status", "created_at"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "description": "Stable identifier for the record."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["lesson", "observation", "delivery_event", "decision", "rejected"]
+    },
+    "topic": { "type": "string" },
+    "summary": { "type": "string", "maxLength": 500 },
+    "details": { "type": "string" },
+    "source": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["active", "superseded", "historical", "rejected"]
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "supersedes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}
