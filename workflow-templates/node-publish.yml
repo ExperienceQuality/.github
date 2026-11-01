@@ -3,7 +3,7 @@ name: Publish
 on:
   push:
     tags:
-      - "package@*"
+      - "example@*"
 
 permissions:
   contents: read
@@ -12,10 +12,10 @@ permissions:
 jobs:
   # hub-stage: publish
   publish:
-    uses: ExperienceQuality/.github/.github/workflows/node-library-publish.yml@v1
+    uses: ExperienceQuality/.github/.github/workflows/node-publish.yml@v1
     with:
       node-version: "24"
       package-manager: npm
-      package-name: "@experiencequality/package"
+      package-name: "@experiencequality/example"
       package-directory: .
-      tag-prefix: package
+      tag-prefix: example

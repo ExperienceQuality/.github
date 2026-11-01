@@ -1,4 +1,4 @@
-name: Reusable Node.js library build
+name: Reusable Node.js build
 
 # hub-stage: build
 on:
@@ -42,12 +42,12 @@ jobs:
           node-version: ${{ inputs.node-version }}
       - name: Build and collect packages
         env:
-          ARTIFACT_DIRECTORY: ${{ runner.temp }}/node-library-build
+          ARTIFACT_DIRECTORY: ${{ runner.temp }}/node-build
           INPUT_PACKAGE_MANAGER: ${{ inputs.package-manager }}
           INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
         run: |
           mkdir -p "$ARTIFACT_DIRECTORY"
-          node workflow-source/scripts/node-library-runner.mjs build \
+          node workflow-source/scripts/node-runner.mjs build \
             --workspace "$GITHUB_WORKSPACE/source" \
             --package-manager "$INPUT_PACKAGE_MANAGER" \
             --working-directory "$INPUT_WORKING_DIRECTORY" \
@@ -55,6 +55,6 @@ jobs:
       - name: Upload packed artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: node-library-package
-          path: ${{ runner.temp }}/node-library-build/*.tgz
+          name: node-package
+          path: ${{ runner.temp }}/node-build/*.tgz
           if-no-files-found: error

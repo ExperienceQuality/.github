@@ -1,6 +1,14 @@
 # ExperienceQuality organization automation
 
-Reusable GitHub Actions workflows and organization workflow templates for publishable Node.js libraries.
+Reusable GitHub Actions workflows and organization workflow templates for publishable Node.js modules.
+
+## Shared workflows
+
+| Workflow | Purpose |
+|----------|---------|
+| `node-build.yml` | Install, run `ci:build`, upload `artifacts/*.tgz` |
+| `node-test.yml` | Install, run `ci:test` |
+| `node-publish.yml` | Tag-gated GitHub Packages publish |
 
 ## Consumer contract
 
@@ -9,7 +17,7 @@ Consumer repositories keep triggers, permissions, and package policy in thin cal
 ```yaml
 jobs:
   build:
-    uses: ExperienceQuality/.github/.github/workflows/node-library-build.yml@v1
+    uses: ExperienceQuality/.github/.github/workflows/node-build.yml@v1
     with:
       node-version: "24"
       package-manager: npm
@@ -23,6 +31,10 @@ Supported package managers are exactly `npm` and `pnpm`. Dependencies are instal
 - Publish installs at repository root and runs root `ci:release`. It requires an exact `<tag-prefix>@<package.json version>` Git tag, exact package identity, a non-private package, an HTTPS `repository` URL matching the caller's GitHub repository, and a clean Git tree after release generation. It packs once, installs that tarball in a clean consumer, verifies name and version, then publishes the same tarball to GitHub Packages. Stable versions use npm dist-tag `latest`; SemVer prereleases use `next`. Callers cannot override this policy.
 
 Commands are fixed by these contracts. Callers cannot supply shell fragments, install commands, test commands, or publish commands.
+
+### Breaking change (hub v1.1.0+)
+
+Reusable workflow paths were renamed from `node-library-build.yml`, `node-library-test.yml`, and `node-library-publish.yml` to **`node-build.yml`**, **`node-test.yml`**, and **`node-publish.yml`**. Update every `uses:` reference; the script contract (`ci:build`, `ci:test`, `ci:release`) is unchanged.
 
 ## GitHub Packages publishing
 
@@ -54,7 +66,7 @@ Reusable workflows check out their helper implementation from `${{ job.workflow_
 
 ## Templates and validation
 
-`workflow-templates/` contains thin build, test, and GitHub Packages publish callers. Replace publish template package policy before use. Validate changes with:
+`workflow-templates/` contains thin build, test, and GitHub Packages publish callers (`node-build`, `node-test`, `node-publish`). Replace publish template package policy before use. Validate changes with:
 
 ```sh
 node --test tests/*.test.mjs
