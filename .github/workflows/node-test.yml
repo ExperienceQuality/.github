@@ -1,4 +1,4 @@
-name: Reusable Node.js library test
+name: Reusable Node.js test
 
 # hub-stage: test
 on:
@@ -45,7 +45,7 @@ jobs:
           INPUT_PACKAGE_MANAGER: ${{ inputs.package-manager }}
           INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
         run: |
-          node workflow-source/scripts/node-library-runner.mjs test \
+          node workflow-source/scripts/node-runner.mjs test \
             --workspace "$GITHUB_WORKSPACE/source" \
             --package-manager "$INPUT_PACKAGE_MANAGER" \
             --working-directory "$INPUT_WORKING_DIRECTORY"

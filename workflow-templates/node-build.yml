@@ -1,4 +1,4 @@
-name: Test
+name: Build
 
 on:
   pull_request:
@@ -9,11 +9,10 @@ permissions:
   contents: read
 
 jobs:
-  # hub-stage: test
-  test:
-    uses: ExperienceQuality/.github/.github/workflows/node-library-test.yml@v1
+  # hub-stage: build
+  build:
+    uses: ExperienceQuality/.github/.github/workflows/node-build.yml@v1
     with:
       node-version: "24"
       package-manager: npm
       working-directory: .
-

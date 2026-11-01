@@ -16,7 +16,7 @@ import {
   validatePublishMetadata,
   validateRepositoryMetadata,
   validateScript,
-} from "../scripts/node-library-runner.mjs";
+} from "../scripts/node-runner.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixture = (name) => join(root, "tests", "fixtures", name);
@@ -181,7 +181,7 @@ test("GitHub Packages requires caller-owner scope", () => {
 });
 
 test("workflows pin actions, avoid long-lived tokens, and keep least privilege", () => {
-  const workflows = ["node-library-build.yml", "node-library-test.yml", "node-library-publish.yml"]
+  const workflows = ["node-build.yml", "node-test.yml", "node-publish.yml"]
     .map((name) => readFileSync(join(root, ".github", "workflows", name), "utf8"));
   const combined = workflows.join("\n");
   assert.doesNotMatch(combined, /NPM_TOKEN|secrets:\s*inherit|id-token:\s*write/);
@@ -198,7 +198,7 @@ test("workflows pin actions, avoid long-lived tokens, and keep least privilege",
   assert.doesNotMatch(workflows[1], /id-token: write/);
   assert.match(workflows[2], /permissions:\n  contents: read\n  packages: write/);
   assert.match(workflows[2], /NODE_AUTH_TOKEN:\s*\$\{\{\s*secrets\.GITHUB_TOKEN\s*\}\}/);
-  const runner = readFileSync(join(root, "scripts", "node-library-runner.mjs"), "utf8");
+  const runner = readFileSync(join(root, "scripts", "node-runner.mjs"), "utf8");
   assert.match(runner, /"publish",\s+tarball,\s+"--tag"/);
   assert.match(runner, /"--tag",\s+metadata\.distTag/);
   assert.match(runner, /"--registry",\s+"https:\/\/npm\.pkg\.github\.com"/);
@@ -206,8 +206,8 @@ test("workflows pin actions, avoid long-lived tokens, and keep least privilege",
 
 test("workflow templates are thin v1 callers with one stage marker each", () => {
   for (const stage of ["build", "test", "publish"]) {
-    const template = readFileSync(join(root, "workflow-templates", `node-library-${stage}.yml`), "utf8");
-    assert.match(template, new RegExp(`uses: ExperienceQuality\\/.github\\/.github\\/workflows\\/node-library-${stage}\\.yml@v1`));
+    const template = readFileSync(join(root, "workflow-templates", `node-${stage}.yml`), "utf8");
+    assert.match(template, new RegExp(`uses: ExperienceQuality\\/.github\\/.github\\/workflows\\/node-${stage}\\.yml@v1`));
     assert.equal([...template.matchAll(/# hub-stage:/g)].length, 1);
   }
 });

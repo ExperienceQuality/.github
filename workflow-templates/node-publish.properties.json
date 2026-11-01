@@ -1,0 +1,6 @@
+{
+  "name": "Node.js publish",
+  "description": "Publish a Node.js module to GitHub Packages through the ExperienceQuality reusable workflow.",
+  "iconName": "octicon package-dependencies",
+  "categories": ["JavaScript", "TypeScript", "npm"]
+}
