@@ -1,75 +1,97 @@
 # ExperienceQuality organization automation
 
-Reusable GitHub Actions workflows and organization workflow templates for publishable Node.js modules.
+Reusable GitHub Actions workflows for Node.js build, test, and publish to GitHub Packages.
 
 ## Shared workflows
 
 | Workflow | Purpose |
 |----------|---------|
-| `node-build.yml` | Install, run `ci:build`, upload `artifacts/*.tgz` |
-| `node-test.yml` | Install, run `ci:test` |
-| `node-publish.yml` | Publish to GitHub Packages when `package.json` version is newer than the registry |
+| `node-build.yml` | Install with frozen lockfile; run `ci:build` |
+| `node-test.yml` | Install with frozen lockfile; run `ci:test` |
+| `node-publish.yml` | Publish package in `working-directory` via `ci:publish` when version is new |
 
 ## Consumer contract
 
-Consumer repositories keep triggers, permissions, and package policy in thin caller workflows. Callers use the protected major tag:
+| Script | Where | Required by |
+|--------|-------|-------------|
+| `ci:build` | `package.json` in `working-directory` | node-build |
+| `ci:test` | `package.json` in `working-directory` | node-test |
+| `ci:publish` | package being published | node-publish |
+
+`ci:publish` builds if needed, then publishes that one package. npm: `"npm publish"` or `"npm run build && npm publish"`. pnpm workspace: `"pnpm run build && pnpm publish --no-git-checks"`.
+
+Root lockfile required (`package-lock.json` or `pnpm-lock.yaml`). pnpm needs root `packageManager: "pnpm@x.y.z"`. Install at root; scripts in `working-directory`.
+
+| Input | Default |
+|-------|---------|
+| `node-version` | `"24"` |
+| `package-manager` (`npm` \| `pnpm`) | required |
+| `working-directory` | `"."` |
+
+`node-publish` output: `published` = `"true"` / `"false"`.
+
+Permissions: build/test `contents: read`. Publish `contents: read` + `packages: write`.
+
+Registry `https://npm.pkg.github.com`, scope `@experiencequality`, auth `NODE_AUTH_TOKEN = github.token` only. No `NPM_TOKEN`, no `secrets: inherit`.
+
+Publish skips `"private": true` or when `npm view <name>@<version>` finds the version; else runs `ci:publish`. Callers use `needs: [build, test]` and `push` to default branch only.
+
+Release = PR that bumps `version` in `package.json`. Merge publishes; no bump publishes nothing.
+
+### Monorepo
+
+Call `node-publish` once per package (`strategy.matrix` over `working-directory`). pnpm workspaces must use `pnpm publish` so `workspace:*` rewrites.
+
+### Caller example
 
 ```yaml
+name: Release
+on:
+  push:
+    branches: [$default-branch]
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   build:
-    uses: ExperienceQuality/.github/.github/workflows/node-build.yml@v1
+    uses: ExperienceQuality/.github/.github/workflows/node-build.yml@v2
     with:
-      node-version: "24"
       package-manager: npm
-      working-directory: .
+  test:
+    uses: ExperienceQuality/.github/.github/workflows/node-test.yml@v2
+    with:
+      package-manager: npm
+  publish:
+    needs: [build, test]
+    uses: ExperienceQuality/.github/.github/workflows/node-publish.yml@v2
+    permissions:
+      contents: read
+      packages: write
+    with:
+      package-manager: npm
 ```
-
-Supported package managers are exactly `npm` and `pnpm`. Dependencies are installed from the repository-root `package-lock.json` with `npm ci`, or `pnpm-lock.yaml` with `pnpm install --frozen-lockfile`. Paths must be relative, must exist, and cannot escape the checkout.
-
-- Build runs `ci:build` in `working-directory`. That script must create one or more packed packages at `artifacts/*.tgz`; those exact files become the workflow artifact.
-- Test runs `ci:test` in `working-directory`.
-- Publish installs at repository root, optionally runs `ci:build` (`prepare: ci:build` or `none`), then for each `package-directories` entry compares `package.json` version to GitHub Packages. Newer versions pack, verify in a clean consumer, and publish. Equal versions skip. Older versions fail. Optional `package-names` must match each directory. Stable versions use npm dist-tag `latest`; SemVer prereleases use `next`. Callers cannot override registry, token, or shell commands.
-
-Commands are fixed by these contracts. Callers cannot supply shell fragments, install commands, test commands, or publish commands.
-
-### Breaking change (hub v1.1.0+)
-
-Reusable workflow paths were renamed from `node-library-*` to **`node-build`**, **`node-test`**, and **`node-publish`**. Publish is no longer tag-gated; it publishes when the local package version is greater than the version on GitHub Packages.
 
 ## GitHub Packages publishing
 
-Publish callers must grant only:
+Use caller `GITHUB_TOKEN` only — no `NPM_TOKEN`, no `secrets: inherit`. Packages use owner scope (e.g. `@experiencequality/example`). First publish gets registry default visibility; maintainer must set visibility and repo access. This hub never changes package visibility.
 
-```yaml
-permissions:
-  contents: read
-  packages: write
-```
+## Breaking changes in v2.0.0
 
-The reusable workflow publishes with the caller's short-lived `GITHUB_TOKEN` to `https://npm.pkg.github.com`. Do not provide `NPM_TOKEN` or inherit secrets. Configure package visibility and repository access in GitHub Packages; no public npm registry approval step is used.
-
-The publish workflow defaults to Node.js 24 and uses the GitHub Packages npm registry. Packages must use the caller-owner scope (for example `@experiencequality/example`).
-
-### Package bootstrap prerequisite
-
-The first GitHub Packages publication creates the package with the registry's default visibility. An authorized maintainer must configure the desired visibility and repository access in GitHub before consumers install it. This repository never changes package visibility automatically.
+- Helper script removed.
+- `ci:release` and `artifacts/*.tgz` contract removed.
+- `package-name`, `package-directory`, `tag-prefix` inputs removed.
+- Tag-gated publish replaced by default-branch push when version is new, via `ci:publish`.
+- Actions bumped: checkout v7, setup-node v7, pnpm/action-setup v6.
 
 ## Release policy
 
-- Create immutable release tags such as `v1.0.0` for every central workflow release.
-- Move protected major tag `v1` only through maintainer-approved release changes after validation.
-- Restrict creation and update of `v1` and `v1.x.y` tags to approved maintainers.
-- Roll back consumers by moving `v1` to a previously validated immutable tag, or pinning a caller to that immutable tag while investigating.
-- Never create package tags or approve npm staging as part of central workflow release validation.
+- Immutable tags `vN.0.0` per release; move major `vN` only after maintainer-approved validation.
+- `vN` / `vN.x.y` tags: maintainers only. Roll back by moving `vN` or pinning callers.
+- Never create package tags as part of hub release validation.
+- `v1` / `v1.1.x` frozen indefinitely: no fixes, never deleted.
 
-Reusable workflows check out their helper implementation from `${{ job.workflow_repository }}` at `${{ job.workflow_sha }}`. This couples helper code to the exact called workflow revision and avoids caller-SHA confusion. These `job` context properties require GitHub.com; GitHub Enterprise Server compatibility is not claimed.
+## Validation
 
-## Templates and validation
-
-`workflow-templates/` contains thin build, test, and GitHub Packages publish callers (`node-build`, `node-test`, `node-publish`). Replace publish template package policy before use. Validate changes with:
-
-```sh
-node --test tests/*.test.mjs
-ruby -e 'require "yaml"; Dir[".github/workflows/*.yml", "workflow-templates/*.yml"].each { |file| YAML.load(File.read(file)) }'
-git diff --check
-```
+Run `actionlint` locally; validate a candidate via consumer branch pinned to candidate SHA.

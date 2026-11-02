@@ -1,6 +1,6 @@
 {
   "name": "Node.js test",
-  "description": "Test a Node.js module through the ExperienceQuality reusable workflow.",
+  "description": "Install with a frozen lockfile and run `ci:test`.",
   "iconName": "octicon check-circle",
   "categories": ["JavaScript", "TypeScript", "npm"]
 }

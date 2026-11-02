@@ -1,18 +1,33 @@
-name: Publish
+name: Release
 
+# Bump "version" in package.json in a PR; merging it publishes. Unchanged versions are skipped.
+# If you use this, remove `push:` from your Build/Test callers so the suite runs once per push.
 on:
   push:
     branches: [$default-branch]
 
 permissions:
   contents: read
-  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  build:
+    uses: ExperienceQuality/.github/.github/workflows/node-build.yml@v2
+    with:
+      package-manager: npm
+  test:
+    uses: ExperienceQuality/.github/.github/workflows/node-test.yml@v2
+    with:
+      package-manager: npm
   # hub-stage: publish
   publish:
-    uses: ExperienceQuality/.github/.github/workflows/node-publish.yml@v1
+    needs: [build, test]
+    uses: ExperienceQuality/.github/.github/workflows/node-publish.yml@v2
+    permissions:
+      contents: read
+      packages: write
     with:
-      node-version: "24"
       package-manager: npm
-      package-directories: .
