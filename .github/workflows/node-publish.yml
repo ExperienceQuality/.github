@@ -1,6 +1,10 @@
 name: Reusable Node.js publish
 
 # hub-stage: publish
+# Publishes the one package in working-directory to GitHub Packages, unless it is private
+# or its version is already published. Callers: push to the default branch only,
+# gate with `needs: [build, test]`, grant contents: read + packages: write.
+# Monorepos: call once per package with a matrix over working-directory.
 on:
   workflow_call:
     inputs:
@@ -10,39 +14,18 @@ on:
         type: string
         default: "24"
       package-manager:
-        description: Package manager (npm or pnpm)
+        description: npm or pnpm
         required: true
         type: string
       working-directory:
-        description: Directory for optional ci:build prepare, relative to repository root
+        description: Directory of the package to publish, relative to the repository root (install always runs at the root)
         required: false
         type: string
         default: "."
-      package-directories:
-        description: Newline or comma-separated package directories relative to repository root
-        required: false
-        type: string
-        default: "."
-      package-names:
-        description: Optional newline or comma-separated names that must match each directory
-        required: false
-        type: string
-        default: ""
-      prepare:
-        description: Run ci:build before packing (ci:build or none)
-        required: false
-        type: string
-        default: ci:build
-      dry-run:
-        description: Pack and verify without publishing
-        required: false
-        type: boolean
-        default: false
-      ref:
-        description: Git ref or SHA to check out (empty uses the caller SHA)
-        required: false
-        type: string
-        default: ""
+    outputs:
+      published:
+        description: '"true" if the package was published'
+        value: ${{ jobs.publish.outputs.published }}
 
 permissions:
   contents: read
@@ -51,51 +34,45 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
     steps:
-      - name: Check out caller
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
-          path: source
-          ref: ${{ inputs.ref }}
-      - name: Check out workflow implementation
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
-          path: workflow-source
-      - name: Set up Node.js for GitHub Packages
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+          persist-credentials: false
+      - if: inputs.package-manager == 'pnpm'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ inputs.node-version }}
           registry-url: https://npm.pkg.github.com
           scope: "@experiencequality"
-      - name: Publish packages newer than GitHub Packages
+          cache: ${{ inputs.package-manager }}
+      - name: Install (frozen lockfile)
         env:
-          ARTIFACT_DIRECTORY: ${{ runner.temp }}/node-publish
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INPUT_PACKAGE_MANAGER: ${{ inputs.package-manager }}
-          INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
-          INPUT_PACKAGE_DIRECTORIES: ${{ inputs.package-directories }}
-          INPUT_PACKAGE_NAMES: ${{ inputs.package-names }}
-          INPUT_PREPARE: ${{ inputs.prepare }}
-          INPUT_DRY_RUN: ${{ inputs.dry-run }}
+          PM: ${{ inputs.package-manager }}
         run: |
-          mkdir -p "$ARTIFACT_DIRECTORY"
-          node workflow-source/scripts/node-runner.mjs publish \
-            --workspace "$GITHUB_WORKSPACE/source" \
-            --package-manager "$INPUT_PACKAGE_MANAGER" \
-            --working-directory "$INPUT_WORKING_DIRECTORY" \
-            --package-directories "$INPUT_PACKAGE_DIRECTORIES" \
-            --package-names "$INPUT_PACKAGE_NAMES" \
-            --prepare "$INPUT_PREPARE" \
-            --dry-run "$INPUT_DRY_RUN" \
-            --github-repository "$GITHUB_REPOSITORY" \
-            --artifact-directory "$ARTIFACT_DIRECTORY"
-      - name: Upload published package artifact
-        if: ${{ always() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: published-node-package
-          path: ${{ runner.temp }}/node-publish/*.tgz
-          if-no-files-found: ignore
+          case "$PM" in
+            pnpm) pnpm install --frozen-lockfile ;;
+            npm)  npm ci ;;
+            *)    echo "::error::package-manager must be npm or pnpm, got '$PM'"; exit 1 ;;
+          esac
+      - name: Publish if new
+        id: publish
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          PM: ${{ inputs.package-manager }}
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if [ "$(node -p "require('./package.json').private === true")" = "true" ]; then
+            echo "$name is private; skipping."
+            echo "published=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "$name@$version is already published; skipping."
+            echo "published=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          $PM run ci:publish
+          echo "published=true" >> "$GITHUB_OUTPUT"

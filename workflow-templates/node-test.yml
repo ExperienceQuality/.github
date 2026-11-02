@@ -11,8 +11,7 @@ permissions:
 jobs:
   # hub-stage: test
   test:
-    uses: ExperienceQuality/.github/.github/workflows/node-test.yml@v1
+    uses: ExperienceQuality/.github/.github/workflows/node-test.yml@v2
     with:
       node-version: "24"
       package-manager: npm
-      working-directory: .

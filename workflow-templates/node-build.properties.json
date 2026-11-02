@@ -1,6 +1,6 @@
 {
   "name": "Node.js build",
-  "description": "Build and pack a Node.js module through the ExperienceQuality reusable workflow.",
+  "description": "Install with a frozen lockfile and run `ci:build`.",
   "iconName": "octicon package",
   "categories": ["JavaScript", "TypeScript", "npm"]
 }
