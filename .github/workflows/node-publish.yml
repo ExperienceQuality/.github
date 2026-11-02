@@ -13,18 +13,36 @@ on:
         description: Package manager (npm or pnpm)
         required: true
         type: string
-      package-name:
-        description: Exact npm package name allowed to publish
-        required: true
+      working-directory:
+        description: Directory for optional ci:build prepare, relative to repository root
+        required: false
         type: string
-      package-directory:
-        description: Package directory relative to repository root
-        required: true
+        default: "."
+      package-directories:
+        description: Newline or comma-separated package directories relative to repository root
+        required: false
         type: string
-      tag-prefix:
-        description: Git tag prefix, without @version
-        required: true
+        default: "."
+      package-names:
+        description: Optional newline or comma-separated names that must match each directory
+        required: false
         type: string
+        default: ""
+      prepare:
+        description: Run ci:build before packing (ci:build or none)
+        required: false
+        type: string
+        default: ci:build
+      dry-run:
+        description: Pack and verify without publishing
+        required: false
+        type: boolean
+        default: false
+      ref:
+        description: Git ref or SHA to check out (empty uses the caller SHA)
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -39,6 +57,7 @@ jobs:
         with:
           fetch-depth: 0
           path: source
+          ref: ${{ inputs.ref }}
       - name: Check out workflow implementation
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -51,23 +70,26 @@ jobs:
           node-version: ${{ inputs.node-version }}
           registry-url: https://npm.pkg.github.com
           scope: "@experiencequality"
-      - name: Verify, pack, and publish exact package
+      - name: Publish packages newer than GitHub Packages
         env:
           ARTIFACT_DIRECTORY: ${{ runner.temp }}/node-publish
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           INPUT_PACKAGE_MANAGER: ${{ inputs.package-manager }}
-          INPUT_PACKAGE_NAME: ${{ inputs.package-name }}
-          INPUT_PACKAGE_DIRECTORY: ${{ inputs.package-directory }}
-          INPUT_TAG_PREFIX: ${{ inputs.tag-prefix }}
+          INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+          INPUT_PACKAGE_DIRECTORIES: ${{ inputs.package-directories }}
+          INPUT_PACKAGE_NAMES: ${{ inputs.package-names }}
+          INPUT_PREPARE: ${{ inputs.prepare }}
+          INPUT_DRY_RUN: ${{ inputs.dry-run }}
         run: |
           mkdir -p "$ARTIFACT_DIRECTORY"
           node workflow-source/scripts/node-runner.mjs publish \
             --workspace "$GITHUB_WORKSPACE/source" \
             --package-manager "$INPUT_PACKAGE_MANAGER" \
-            --package-name "$INPUT_PACKAGE_NAME" \
-            --package-directory "$INPUT_PACKAGE_DIRECTORY" \
-            --tag-prefix "$INPUT_TAG_PREFIX" \
-            --git-ref "$GITHUB_REF" \
+            --working-directory "$INPUT_WORKING_DIRECTORY" \
+            --package-directories "$INPUT_PACKAGE_DIRECTORIES" \
+            --package-names "$INPUT_PACKAGE_NAMES" \
+            --prepare "$INPUT_PREPARE" \
+            --dry-run "$INPUT_DRY_RUN" \
             --github-repository "$GITHUB_REPOSITORY" \
             --artifact-directory "$ARTIFACT_DIRECTORY"
       - name: Upload published package artifact

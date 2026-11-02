@@ -13,7 +13,11 @@ import {
   validateLockfile,
   validateGitHubPackageName,
   validatePackageManager,
-  validatePublishMetadata,
+  compareSemver,
+  parsePackageDirectories,
+  publishDecision,
+  validatePrepare,
+  validatePublishablePackage,
   validateRepositoryMetadata,
   validateScript,
 } from "../scripts/node-runner.mjs";
@@ -94,53 +98,41 @@ test("missing contract scripts are rejected", () => {
   assert.throws(() => validateScript({ scripts: {} }, "ci:release"), /missing required ci:release script/);
 });
 
-test("publish metadata accepts exact package identity and tag", () => {
+test("publish metadata accepts package identity and dist-tags", () => {
   assert.deepEqual(
-    validatePublishMetadata({
-      manifest: { name: "@experiencequality/example", version: "1.2.3" },
-      packageName: "@experiencequality/example",
-      tagPrefix: "example",
-      gitRef: "refs/tags/example@1.2.3",
-    }),
-    { name: "@experiencequality/example", version: "1.2.3", expectedRef: "refs/tags/example@1.2.3", distTag: "latest" },
+    validatePublishablePackage({ name: "@experiencequality/example", version: "1.2.3" }),
+    { name: "@experiencequality/example", version: "1.2.3", distTag: "latest" },
   );
+  assert.equal(validatePublishablePackage({ name: "example", version: "1.2.3+build-5" }).distTag, "latest");
+  assert.equal(validatePublishablePackage({ name: "example", version: "1.2.3-beta.1+build-5" }).distTag, "next");
 });
 
-test("publish metadata assigns deterministic stable and prerelease dist-tags", () => {
-  const stable = validatePublishMetadata({
-    manifest: { name: "example", version: "1.2.3+build-5" },
-    packageName: "example",
-    tagPrefix: "example",
-    gitRef: "refs/tags/example@1.2.3+build-5",
-  });
-  const prerelease = validatePublishMetadata({
-    manifest: { name: "example", version: "1.2.3-beta.1+build-5" },
-    packageName: "example",
-    tagPrefix: "example",
-    gitRef: "refs/tags/example@1.2.3-beta.1+build-5",
-  });
-  assert.equal(stable.distTag, "latest");
-  assert.equal(prerelease.distTag, "next");
-});
-
-test("publish metadata rejects malformed tag, wrong identity, and private package", () => {
+test("publish metadata rejects wrong identity, private package, and bad version", () => {
   const manifest = { name: "example", version: "1.2.3" };
   assert.throws(
-    () => validatePublishMetadata({ manifest, packageName: "example", tagPrefix: "example", gitRef: "refs/tags/example@1.2.4" }),
-    /tag mismatch/,
-  );
-  assert.throws(
-    () => validatePublishMetadata({ manifest, packageName: "other", tagPrefix: "example", gitRef: "refs/tags/example@1.2.3" }),
+    () => validatePublishablePackage(manifest, "other"),
     /unexpected package identity/,
   );
   assert.throws(
-    () => validatePublishMetadata({ manifest: { ...manifest, private: true }, packageName: "example", tagPrefix: "example", gitRef: "refs\/tags\/example@1.2.3" }),
+    () => validatePublishablePackage({ ...manifest, private: true }),
     /private and cannot be published/,
   );
   assert.throws(
-    () => validatePublishMetadata({ manifest: { ...manifest, version: "latest" }, packageName: "example", tagPrefix: "example", gitRef: "refs/tags/example@latest" }),
+    () => validatePublishablePackage({ ...manifest, version: "latest" }),
     /valid semantic version/,
   );
+});
+
+test("publish compares local package.json version to the registry", () => {
+  assert.equal(compareSemver("1.0.6", "1.0.5"), 1);
+  assert.equal(publishDecision("1.0.6", "1.0.5"), "publish");
+  assert.equal(publishDecision("1.0.5", "1.0.5"), "skip");
+  assert.equal(publishDecision("1.0.4", "1.0.5"), "downgrade");
+  assert.equal(publishDecision("1.0.0", null), "publish");
+  assert.deepEqual(parsePackageDirectories("packages/core\npackages/db"), ["packages/core", "packages/db"]);
+  assert.deepEqual(parsePackageDirectories(""), ["."]);
+  assert.equal(validatePrepare("none"), "none");
+  assert.throws(() => validatePrepare("rm -rf /"), /prepare must be ci:build or none/);
 });
 
 test("repository metadata must match trusted caller repository", () => {

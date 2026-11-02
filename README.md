@@ -8,7 +8,7 @@ Reusable GitHub Actions workflows and organization workflow templates for publis
 |----------|---------|
 | `node-build.yml` | Install, run `ci:build`, upload `artifacts/*.tgz` |
 | `node-test.yml` | Install, run `ci:test` |
-| `node-publish.yml` | Tag-gated GitHub Packages publish |
+| `node-publish.yml` | Publish to GitHub Packages when `package.json` version is newer than the registry |
 
 ## Consumer contract
 
@@ -28,13 +28,13 @@ Supported package managers are exactly `npm` and `pnpm`. Dependencies are instal
 
 - Build runs `ci:build` in `working-directory`. That script must create one or more packed packages at `artifacts/*.tgz`; those exact files become the workflow artifact.
 - Test runs `ci:test` in `working-directory`.
-- Publish installs at repository root and runs root `ci:release`. It requires an exact `<tag-prefix>@<package.json version>` Git tag, exact package identity, a non-private package, an HTTPS `repository` URL matching the caller's GitHub repository, and a clean Git tree after release generation. It packs once, installs that tarball in a clean consumer, verifies name and version, then publishes the same tarball to GitHub Packages. Stable versions use npm dist-tag `latest`; SemVer prereleases use `next`. Callers cannot override this policy.
+- Publish installs at repository root, optionally runs `ci:build` (`prepare: ci:build` or `none`), then for each `package-directories` entry compares `package.json` version to GitHub Packages. Newer versions pack, verify in a clean consumer, and publish. Equal versions skip. Older versions fail. Optional `package-names` must match each directory. Stable versions use npm dist-tag `latest`; SemVer prereleases use `next`. Callers cannot override registry, token, or shell commands.
 
 Commands are fixed by these contracts. Callers cannot supply shell fragments, install commands, test commands, or publish commands.
 
 ### Breaking change (hub v1.1.0+)
 
-Reusable workflow paths were renamed from `node-library-build.yml`, `node-library-test.yml`, and `node-library-publish.yml` to **`node-build.yml`**, **`node-test.yml`**, and **`node-publish.yml`**. Update every `uses:` reference; the script contract (`ci:build`, `ci:test`, `ci:release`) is unchanged.
+Reusable workflow paths were renamed from `node-library-*` to **`node-build`**, **`node-test`**, and **`node-publish`**. Publish is no longer tag-gated; it publishes when the local package version is greater than the version on GitHub Packages.
 
 ## GitHub Packages publishing
 

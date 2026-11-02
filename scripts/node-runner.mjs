@@ -71,24 +71,78 @@ export function validateLockfile(workspace, packageManager) {
   return expected;
 }
 
-export function validatePublishMetadata({ manifest, packageName, tagPrefix, gitRef }) {
-  if (!PACKAGE_NAME.test(packageName)) throw new Error("package-name is not a valid lowercase npm package name");
-  if (!PACKAGE_NAME.test(tagPrefix) || tagPrefix.startsWith("@")) {
-    throw new Error("tag-prefix must be an unscoped lowercase npm-style name");
+export function parseList(value) {
+  return String(value ?? "")
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export function parsePackageDirectories(value) {
+  const items = parseList(value);
+  return items.length === 0 ? ["."] : items;
+}
+
+export function validatePrepare(value) {
+  if (value !== "ci:build" && value !== "none") {
+    throw new Error(`prepare must be ci:build or none; received ${JSON.stringify(value)}`);
   }
-  if (manifest.name !== packageName) {
-    throw new Error(`unexpected package identity: expected ${packageName}, found ${String(manifest.name)}`);
+  return value;
+}
+
+export function parseComparableVersion(version) {
+  if (typeof version !== "string" || !SEMVER.test(version)) {
+    throw new Error(`invalid semantic version: ${String(version)}`);
+  }
+  const [coreAndPre] = version.split("+");
+  const [core, ...preParts] = coreAndPre.split("-");
+  const [major, minor, patch] = core.split(".").map(Number);
+  return { major, minor, patch, prerelease: preParts.join("-") };
+}
+
+export function compareSemver(leftVersion, rightVersion) {
+  const left = parseComparableVersion(leftVersion);
+  const right = parseComparableVersion(rightVersion);
+  if (left.major !== right.major) return left.major - right.major;
+  if (left.minor !== right.minor) return left.minor - right.minor;
+  if (left.patch !== right.patch) return left.patch - right.patch;
+  if (!left.prerelease && right.prerelease) return 1;
+  if (left.prerelease && !right.prerelease) return -1;
+  if (left.prerelease === right.prerelease) return 0;
+  return left.prerelease < right.prerelease ? -1 : 1;
+}
+
+export function publishDecision(localVersion, publishedVersion) {
+  if (publishedVersion == null || publishedVersion === "") return "publish";
+  const comparison = compareSemver(localVersion, publishedVersion);
+  if (comparison > 0) return "publish";
+  if (comparison === 0) return "skip";
+  return "downgrade";
+}
+
+export function readPublishedVersion(packageName, registry = "https://npm.pkg.github.com") {
+  const result = spawnSync("npm", ["view", packageName, "version", "--registry", registry], { encoding: "utf8" });
+  if (result.status === 0) {
+    const version = result.stdout.trim();
+    return version === "" ? null : version;
+  }
+  const text = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  if (/E404|404 Not Found|is not in this registry|not found/i.test(text)) return null;
+  throw new Error(`failed to read published version for ${packageName}: ${text.trim() || `exit ${result.status}`}`);
+}
+
+export function validatePublishablePackage(manifest, expectedName = "") {
+  const packageName = manifest.name;
+  if (!PACKAGE_NAME.test(packageName)) throw new Error("package name is not a valid lowercase npm package name");
+  if (expectedName && packageName !== expectedName) {
+    throw new Error(`unexpected package identity: expected ${expectedName}, found ${String(packageName)}`);
   }
   if (manifest.private === true) throw new Error(`${packageName} is private and cannot be published`);
   if (typeof manifest.version !== "string" || !SEMVER.test(manifest.version)) {
     throw new Error(`${packageName} must have a valid semantic version`);
   }
-  const expectedRef = `refs/tags/${tagPrefix}@${manifest.version}`;
-  if (gitRef !== expectedRef) {
-    throw new Error(`tag mismatch: expected ${expectedRef}, received ${gitRef}`);
-  }
   const distTag = manifest.version.split("+")[0].includes("-") ? "next" : "latest";
-  return { name: packageName, version: manifest.version, expectedRef, distTag };
+  return { name: packageName, version: manifest.version, distTag };
 }
 
 export function validateRepositoryMetadata(manifest, githubRepository) {
@@ -214,11 +268,6 @@ export function collectBuildArtifacts(workingDirectory, destination) {
   }
 }
 
-function ensureClean(workspace) {
-  const status = capture("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: workspace });
-  if (status !== "") throw new Error(`ci:release left generated output dirty:\n${status}`);
-}
-
 function verifyTarball(tarball, metadata) {
   const consumer = mkdtempSync(join(tmpdir(), "xq-node-library-consumer-"));
   run("npm", ["init", "--yes"], { cwd: consumer });
@@ -260,25 +309,48 @@ export function main(argv = process.argv.slice(2)) {
     return;
   }
 
-  const packageDirectory = resolveSafeDirectory(workspace, values["package-directory"], "package-directory");
-  const manifest = readManifest(packageDirectory);
-  const metadata = validatePublishMetadata({
-    manifest,
-    packageName: values["package-name"],
-    tagPrefix: values["tag-prefix"],
-    gitRef: values["git-ref"],
-  });
-  validateRepositoryMetadata(manifest, values["github-repository"]);
-  validateGitHubPackageName(metadata.name, values["github-repository"]);
+  const directories = parsePackageDirectories(values["package-directories"] ?? values["package-directory"] ?? ".");
+  const expectedNames = parseList(values["package-names"] ?? values["package-name"] ?? "");
+  if (expectedNames.length > 0 && expectedNames.length !== directories.length) {
+    throw new Error("package-names count must match package-directories count");
+  }
+  const prepare = validatePrepare(values.prepare ?? "ci:build");
+  const dryRun = values["dry-run"] === "true";
   installDependencies(workspace, packageManager);
-  runContract(workspace, packageManager, "ci:release");
-  ensureClean(workspace);
+  if (prepare === "ci:build") {
+    const workingDirectory = resolveSafeDirectory(workspace, values["working-directory"] ?? ".", "working-directory");
+    runContract(workingDirectory, packageManager, "ci:build");
+  }
   const artifactDirectory = resolve(values["artifact-directory"]);
-  const tarball = pack(packageDirectory, artifactDirectory);
-  verifyTarball(tarball, metadata);
-  run("npm", ["publish", tarball, "--tag", metadata.distTag, "--registry", "https://npm.pkg.github.com"], {
-    cwd: workspace,
-  });
+  mkdirSync(artifactDirectory, { recursive: true });
+  let publishedCount = 0;
+  for (const [index, directory] of directories.entries()) {
+    const packageDirectory = resolveSafeDirectory(workspace, directory, "package-directory");
+    const manifest = readManifest(packageDirectory);
+    const metadata = validatePublishablePackage(manifest, expectedNames[index] ?? "");
+    validateRepositoryMetadata(manifest, values["github-repository"]);
+    validateGitHubPackageName(metadata.name, values["github-repository"]);
+    const publishedVersion = readPublishedVersion(metadata.name);
+    const decision = publishDecision(metadata.version, publishedVersion);
+    if (decision === "skip") {
+      console.log(`skip ${metadata.name}@${metadata.version} (already published)`);
+      continue;
+    }
+    if (decision === "downgrade") {
+      throw new Error(`${metadata.name} local ${metadata.version} is behind published ${publishedVersion}`);
+    }
+    const tarball = pack(packageDirectory, artifactDirectory);
+    verifyTarball(tarball, metadata);
+    if (dryRun) {
+      console.log(`dry-run ${metadata.name}@${metadata.version} ${basename(tarball)}`);
+      continue;
+    }
+    run("npm", ["publish", tarball, "--tag", metadata.distTag, "--registry", "https://npm.pkg.github.com"], {
+      cwd: workspace,
+    });
+    publishedCount += 1;
+  }
+  console.log(`published ${publishedCount} package(s)`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
