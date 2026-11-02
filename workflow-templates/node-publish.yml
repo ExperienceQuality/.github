@@ -2,8 +2,7 @@ name: Publish
 
 on:
   push:
-    tags:
-      - "example@*"
+    branches: [$default-branch]
 
 permissions:
   contents: read
@@ -16,6 +15,4 @@ jobs:
     with:
       node-version: "24"
       package-manager: npm
-      package-name: "@experiencequality/example"
-      package-directory: .
-      tag-prefix: example
+      package-directories: .
