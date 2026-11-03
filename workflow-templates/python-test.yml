@@ -1,0 +1,16 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [$default-branch]
+
+permissions:
+  contents: read
+
+jobs:
+  # hub-stage: test
+  test:
+    uses: ExperienceQuality/.github/.github/workflows/python-test.yml@v2
+    with:
+      python-version: "3.12"

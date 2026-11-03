@@ -1,0 +1,6 @@
+{
+  "name": "Python build",
+  "description": "Install with a frozen uv.lock and run `ci-build`.",
+  "iconName": "octicon package",
+  "categories": ["Python", "uv"]
+}
