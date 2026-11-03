@@ -1,6 +1,6 @@
 # ExperienceQuality organization automation
 
-Reusable GitHub Actions workflows for Node.js build, test, and publish to GitHub Packages.
+Reusable GitHub Actions workflows for Node.js and Python build, test, and publish.
 
 ## Shared workflows
 
@@ -9,8 +9,11 @@ Reusable GitHub Actions workflows for Node.js build, test, and publish to GitHub
 | `node-build.yml` | Install with frozen lockfile; run `ci:build` |
 | `node-test.yml` | Install with frozen lockfile; run `ci:test` |
 | `node-publish.yml` | Publish package in `working-directory` via `ci:publish` when version is new |
+| `python-build.yml` | `uv sync --frozen`; run `ci-build` |
+| `python-test.yml` | `uv sync --frozen`; run `ci-test` |
+| `python-publish.yml` | Run `ci-publish` (writes `dist/`), create GitHub Release when version is new |
 
-## Consumer contract
+## Node.js consumer contract
 
 | Script | Where | Required by |
 |--------|-------|-------------|
@@ -38,11 +41,11 @@ Publish skips `"private": true` or when `npm view <name>@<version>` finds the ve
 
 Release = PR that bumps `version` in `package.json`. Merge publishes; no bump publishes nothing.
 
-### Monorepo
+### Node monorepo
 
 Call `node-publish` once per package (`strategy.matrix` over `working-directory`). pnpm workspaces must use `pnpm publish` so `workspace:*` rewrites.
 
-### Caller example
+### Node caller example
 
 ```yaml
 name: Release
@@ -73,7 +76,61 @@ jobs:
       package-manager: npm
 ```
 
-## GitHub Packages publishing
+## Python consumer contract
+
+Tooling is **uv** only. Root `uv.lock` required. `uv sync --frozen` always runs at the repository root; scripts run in `working-directory`.
+
+| Script | Where | Required by |
+|--------|-------|-------------|
+| `ci-build` | `[project.scripts]` (run via `uv run --frozen`) | python-build |
+| `ci-test` | `[project.scripts]` (run via `uv run --frozen`) | python-test |
+| `ci-publish` | `[project.scripts]` (run via `uv run --frozen`) | python-publish |
+
+`ci-publish` must write release assets under `dist/` in `working-directory` (for example `uv build`). The hub then creates a GitHub Release and uploads those files. GitHub Packages has no Python registry — do not publish wheels there.
+
+| Input | Default |
+|-------|---------|
+| `python-version` | `"3.12"` |
+| `working-directory` | `"."` |
+| `tag-prefix` (publish only) | `""` (release tag `vVERSION`) |
+
+`python-publish` output: `published` = `"true"` / `"false"`.
+
+Permissions: build/test `contents: read`. Publish `contents: write` (create release + upload assets). Auth `GH_TOKEN = github.token` only. No extra secrets, no `secrets: inherit`.
+
+Publish skips when `pyproject.toml` has classifier `Private :: Do Not Upload`, or when `gh release view` finds tag `{tag-prefix}v{version}`; else runs `ci-publish` and `gh release create`. Callers use `needs: [build, test]` and `push` to default branch only.
+
+Release = PR that bumps static `project.version` in `pyproject.toml` (dynamic versions unsupported). Merge publishes; unchanged version (existing tag) publishes nothing.
+
+### Python monorepo
+
+Call `python-publish` once per package (`strategy.matrix` over `working-directory`). Use a distinct `tag-prefix` when packages can share the same SemVer (release tags are repository-global).
+
+### Python caller example
+
+```yaml
+name: Release
+on:
+  push:
+    branches: [$default-branch]
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    uses: ExperienceQuality/.github/.github/workflows/python-build.yml@v2
+  test:
+    uses: ExperienceQuality/.github/.github/workflows/python-test.yml@v2
+  publish:
+    needs: [build, test]
+    uses: ExperienceQuality/.github/.github/workflows/python-publish.yml@v2
+    permissions:
+      contents: write
+```
+
+## GitHub Packages publishing (Node.js)
 
 Use caller `GITHUB_TOKEN` only — no `NPM_TOKEN`, no `secrets: inherit`. Packages use owner scope (e.g. `@experiencequality/example`). First publish gets registry default visibility; maintainer must set visibility and repo access. This hub never changes package visibility.
 

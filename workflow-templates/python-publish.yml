@@ -1,0 +1,27 @@
+name: Release
+
+# Bump "version" in pyproject.toml in a PR; merging it publishes a GitHub Release
+# with assets from dist/. Unchanged versions (existing release tag) are skipped.
+# If you use this, remove `push:` from your Build/Test callers so the suite runs once per push.
+on:
+  push:
+    branches: [$default-branch]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ExperienceQuality/.github/.github/workflows/python-build.yml@v2
+  test:
+    uses: ExperienceQuality/.github/.github/workflows/python-test.yml@v2
+  # hub-stage: publish
+  publish:
+    needs: [build, test]
+    uses: ExperienceQuality/.github/.github/workflows/python-publish.yml@v2
+    permissions:
+      contents: write

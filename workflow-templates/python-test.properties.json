@@ -1,0 +1,6 @@
+{
+  "name": "Python test",
+  "description": "Install with a frozen uv.lock and run `ci-test`.",
+  "iconName": "octicon check-circle",
+  "categories": ["Python", "uv"]
+}

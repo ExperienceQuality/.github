@@ -1,0 +1,6 @@
+{
+  "name": "Python publish",
+  "description": "Build assets via `ci-publish` and create a GitHub Release when the version is new.",
+  "iconName": "octicon rocket",
+  "categories": ["Python", "uv"]
+}
