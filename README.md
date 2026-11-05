@@ -2,6 +2,8 @@
 
 Reusable GitHub Actions workflows for Node.js and Python build, test, and publish.
 
+For org engineering process, see [SDLC.md](SDLC.md).
+
 ## Shared workflows
 
 | Workflow | Purpose |
